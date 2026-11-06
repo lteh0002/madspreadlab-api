@@ -70,7 +70,5 @@ export async function listJpxCash(req, res) {
     JpxCash.countDocuments(filter),
   ]);
 
-  console.log(data)
-
   res.json({ data, page, limit, total });
 }
