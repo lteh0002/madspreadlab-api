@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import itemRoutes from './item.routes.js';
+import jpxCashRoutes from './jpxCash.routes.js';
 
 const router = Router();
 
@@ -10,5 +11,6 @@ router.get('/health', (req, res) => {
 });
 
 router.use('/items', itemRoutes);
+router.use('/jpx-cash', jpxCashRoutes);
 
 export default router;
