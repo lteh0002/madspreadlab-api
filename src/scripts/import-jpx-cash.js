@@ -2,7 +2,8 @@
 // Expects columns: Date | Time | 1x6 Cash. Safe to re-run: rows are upserted on (date, session).
 import ExcelJS from 'exceljs';
 import { connectDB, disconnectDB } from '../config/db.js';
-import { JpxCash, SESSIONS } from '../models/JpxCash.js';
+import { SESSIONS } from '../models/JpxCash.js';
+import { upsertJpxCash } from '../services/jpxCash.service.js';
 
 const file = process.argv[2];
 if (!file) {
@@ -31,9 +32,8 @@ async function main() {
   await workbook.xlsx.readFile(file);
   const sheet = workbook.worksheets[0];
 
-  const ops = [];
+  const rows = [];
   const errors = [];
-  const now = new Date();
 
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // header
@@ -47,27 +47,7 @@ async function main() {
     if (!date) errors.push(`row ${rowNumber}: bad date ${JSON.stringify(dateCell)}`);
     else if (!SESSIONS.includes(session)) errors.push(`row ${rowNumber}: bad session ${JSON.stringify(timeCell)}`);
     else if (valueCell == null || Number.isNaN(value)) errors.push(`row ${rowNumber}: bad value ${JSON.stringify(valueCell)}`);
-    else {
-      ops.push({
-        updateOne: {
-          filter: { date, session },
-          // Pipeline update so timestamps only move when something actually changes:
-          // createdAt is set once on insert; updatedAt bumps only if the value differs.
-          update: [
-            {
-              $set: {
-                createdAt: { $ifNull: ['$createdAt', now] },
-                updatedAt: {
-                  $cond: [{ $eq: ['$value', { $literal: value }] }, { $ifNull: ['$updatedAt', now] }, now],
-                },
-              },
-            },
-            { $set: { value: { $literal: value }, spread_name: '1x6', source: 'import' } },
-          ],
-          upsert: true,
-        },
-      });
-    }
+    else rows.push({ date, session, value });
   });
 
   if (errors.length) {
@@ -78,16 +58,8 @@ async function main() {
 
   await connectDB();
   try {
-    // Runs createIndex for each index declared on the schema (idempotent).
-    await JpxCash.createIndexes();
-    // Native driver bulkWrite: rows are validated above, and Mongoose's automatic
-    // timestamps would otherwise bump updatedAt on every re-import.
-    const res = await JpxCash.collection.bulkWrite(ops, { ordered: false });
-    console.log(
-      `Parsed ${ops.length} rows -> inserted ${res.upsertedCount}, updated ${res.modifiedCount}, unchanged ${
-        res.matchedCount - res.modifiedCount
-      }`,
-    );
+    const { inserted, updated, unchanged } = await upsertJpxCash(rows);
+    console.log(`Parsed ${rows.length} rows -> inserted ${inserted}, updated ${updated}, unchanged ${unchanged}`);
   } finally {
     await disconnectDB();
   }

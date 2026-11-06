@@ -5,7 +5,8 @@ import { env } from '../config/env.js';
 export function errorHandler(err, req, res, next) {
   let status = err.status ?? 500;
   let message = err.message ?? 'Internal server error';
-  let details;
+  // e.g. the per-row problems from an upload (see services/spreadBar.service.js)
+  let details = err.details;
 
   if (err instanceof mongoose.Error.ValidationError) {
     status = 400;
