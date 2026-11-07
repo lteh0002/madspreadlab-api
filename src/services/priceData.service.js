@@ -161,3 +161,60 @@ export async function listFairValues() {
       spreads: list.sort((a, b) => a._n - b._n || a.months - b.months).map(({ _n, ...s }) => s),
     }));
 }
+
+/**
+ * Every product, by name, with all its spreads (newest contracts first) and how many price
+ * bars each has across all intervals. For the admin page, so spreads without bars are included.
+ */
+export async function listProductsWithSpreads() {
+  const [products, spreads, counts] = await Promise.all([
+    Product.find().select('_id name exchange currency').sort({ name: 1 }).lean(),
+    Spread.find().lean(),
+    SpreadBar.aggregate([{ $group: { _id: '$spreadId', bars: { $sum: 1 } } }]),
+  ]);
+  const barsBySpread = new Map(counts.map((c) => [String(c._id), c.bars]));
+  const byProduct = new Map(products.map((p) => [String(p._id), { ...p, spreads: [] }]));
+
+  for (const s of spreads) {
+    const entry = byProduct.get(String(s.productId));
+    if (!entry) continue;
+    entry.spreads.push({
+      id: s._id,
+      spreadName: s.spreadName,
+      front: contractLabel(s.frontMonth, s.frontYear),
+      back: contractLabel(s.backMonth, s.backYear),
+      months: monthNumber(s.backMonth, s.backYear) - monthNumber(s.frontMonth, s.frontYear),
+      fairValue: toFairValue(s.fairValue),
+      bars: barsBySpread.get(String(s._id)) ?? 0,
+      _n: monthNumber(s.frontMonth, s.frontYear),
+    });
+  }
+
+  return [...byProduct.values()].map(({ spreads: list, ...p }) => ({
+    ...p,
+    spreads: list.sort((a, b) => b._n - a._n || b.months - a.months).map(({ _n, ...s }) => s),
+  }));
+}
+
+/**
+ * Set a spread's fair value, or clear it with null. Accepts a number or a numeric string.
+ * Resolves with { id, fairValue }.
+ */
+export async function setFairValue(spreadId, body = {}) {
+  if (!mongoose.isValidObjectId(spreadId)) throw badRequest('Invalid spread id');
+  if (!('fairValue' in body)) throw badRequest('Missing fairValue: a number, or null to clear it');
+
+  const raw = body.fairValue;
+  let update;
+  if (raw === null || raw === '') {
+    update = { $unset: { fairValue: 1 } };
+  } else {
+    const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : NaN;
+    if (!Number.isFinite(n)) throw badRequest('fairValue must be a number, or null to clear it');
+    update = { $set: { fairValue: n } };
+  }
+
+  const spread = await Spread.findByIdAndUpdate(spreadId, update, { new: true }).lean();
+  if (!spread) throw notFound("That spread doesn't exist.");
+  return { id: spread._id, fairValue: toFairValue(spread.fairValue) };
+}

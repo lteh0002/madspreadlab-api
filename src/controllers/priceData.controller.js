@@ -24,3 +24,20 @@ export async function listPriceData(req, res) {
 export async function listFairValues(req, res) {
   res.json({ data: await priceDataService.listFairValues() });
 }
+
+/**
+ * GET /api/products
+ * 200 { data: [{ _id, name, exchange, currency, spreads: [{ id, spreadName, front, back, months, fairValue, bars }] }] }
+ */
+export async function listProducts(req, res) {
+  res.json({ data: await priceDataService.listProductsWithSpreads() });
+}
+
+/**
+ * PATCH /api/spreads/:id/fair-value
+ * Body: { fairValue: number | null }  (null or "" clears it)
+ * 200 { data: { id, fairValue } }
+ */
+export async function updateFairValue(req, res) {
+  res.json({ data: await priceDataService.setFairValue(req.params.id, req.body ?? {}) });
+}
