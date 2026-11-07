@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Product } from '../models/Product.js';
+import { PRODUCT_TYPES, Product } from '../models/Product.js';
 import { Spread } from '../models/Spread.js';
 import { SpreadBar } from '../models/SpreadBar.js';
 import { badRequest, httpError, notFound } from '../utils/httpError.js';
@@ -165,12 +165,28 @@ export async function listFairValues() {
 /**
  * Every product, by name, with all its spreads (newest contracts first) and how many price
  * bars each has across all intervals. For the admin page, so spreads without bars are included.
+ * Options: productType (optional, "indices" or "commodities") lists only products of that type.
  */
-export async function listProductsWithSpreads() {
-  const [products, spreads, counts] = await Promise.all([
-    Product.find().select('_id name exchange currency').sort({ name: 1 }).lean(),
-    Spread.find().lean(),
-    SpreadBar.aggregate([{ $group: { _id: '$spreadId', bars: { $sum: 1 } } }]),
+export async function listProductsWithSpreads({ productType } = {}) {
+  let filter = {};
+  if (productType !== undefined) {
+    const t = String(productType).trim().toLowerCase();
+    if (!PRODUCT_TYPES.includes(t)) {
+      throw badRequest(`Invalid productType: expected ${PRODUCT_TYPES.join(' or ')}`);
+    }
+    filter = { productType: t };
+  }
+  const products = await Product.find(filter)
+    .select('_id name exchange currency productType')
+    .sort({ name: 1 })
+    .lean();
+  const productIds = products.map((p) => p._id);
+  const [spreads, counts] = await Promise.all([
+    Spread.find({ productId: { $in: productIds } }).lean(),
+    SpreadBar.aggregate([
+      { $match: { productId: { $in: productIds } } },
+      { $group: { _id: '$spreadId', bars: { $sum: 1 } } },
+    ]),
   ]);
   const barsBySpread = new Map(counts.map((c) => [String(c._id), c.bars]));
   const byProduct = new Map(products.map((p) => [String(p._id), { ...p, spreads: [] }]));

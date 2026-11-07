@@ -2,7 +2,8 @@ import * as productService from '../services/product.service.js';
 
 /**
  * POST /api/create-product
- * Body: { name, exchange, currency } – all required strings.
+ * Body: { name, exchange, currency, productType } – all required strings;
+ * productType is "indices" or "commodities".
  */
 export async function createProduct(req, res) {
   const product = await productService.createProduct(req.body ?? {});

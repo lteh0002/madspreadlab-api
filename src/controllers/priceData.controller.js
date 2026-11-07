@@ -26,11 +26,11 @@ export async function listFairValues(req, res) {
 }
 
 /**
- * GET /api/products
+ * GET /api/products[?productType=indices]
  * 200 { data: [{ _id, name, exchange, currency, spreads: [{ id, spreadName, front, back, months, fairValue, bars }] }] }
  */
 export async function listProducts(req, res) {
-  res.json({ data: await priceDataService.listProductsWithSpreads() });
+  res.json({ data: await priceDataService.listProductsWithSpreads(req.query) });
 }
 
 /**
