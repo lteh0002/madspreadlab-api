@@ -13,6 +13,13 @@ function contractLabel(code, year) {
   return `${i < 0 ? code : MONTH_NAMES[i]}${String(year).slice(-2)}`;
 }
 
+/** A spread's fairValue as a finite number, else null (missing, empty, or not a number) */
+function toFairValue(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Find one product by name (optionally narrowed by exchange, since names are unique per exchange) */
 async function findProduct(name, exchange) {
   if (!name) throw badRequest('Missing product, e.g. ?product=MCA');
@@ -69,6 +76,7 @@ export async function listSpreads({ product: name, exchange } = {}) {
       spreadName: s.spreadName,
       front: contractLabel(s.frontMonth, s.frontYear),
       back: contractLabel(s.backMonth, s.backYear),
+      fairValue: toFairValue(s.fairValue),
       intervals: intervalsBySpread.get(String(s._id)),
     }));
 
@@ -111,4 +119,45 @@ export async function listPriceData(options = {}) {
   bars.reverse();
 
   return { data: bars, interval, limit, truncated: bars.length === limit };
+}
+
+/** Contract as months since year 0, so Dec26 → Jan27 is +1 */
+const monthNumber = (code, year) => year * 12 + FUTURES_MONTH_CODES.indexOf(code);
+
+/**
+ * Every spread that has a fair value, grouped by product (by name), oldest contracts first.
+ * Unlike listSpreads, a spread doesn't need price data to be listed.
+ */
+export async function listFairValues() {
+  const spreads = await Spread.find({ fairValue: { $exists: true, $ne: null } }).lean();
+  const productIds = [...new Set(spreads.map((s) => String(s.productId)))];
+  const products = await Product.find({ _id: { $in: productIds } })
+    .select('_id name exchange currency')
+    .lean();
+  const byId = new Map(products.map((p) => [String(p._id), { product: p, spreads: [] }]));
+
+  for (const s of spreads) {
+    const fairValue = toFairValue(s.fairValue);
+    const entry = byId.get(String(s.productId));
+    if (fairValue === null || !entry) continue;
+    const front = monthNumber(s.frontMonth, s.frontYear);
+    const back = monthNumber(s.backMonth, s.backYear);
+    entry.spreads.push({
+      id: s._id,
+      spreadName: s.spreadName,
+      front: contractLabel(s.frontMonth, s.frontYear),
+      back: contractLabel(s.backMonth, s.backYear),
+      months: back - front,
+      fairValue,
+      _n: front,
+    });
+  }
+
+  return [...byId.values()]
+    .filter((p) => p.spreads.length > 0)
+    .sort((a, b) => a.product.name.localeCompare(b.product.name))
+    .map(({ product, spreads: list }) => ({
+      product,
+      spreads: list.sort((a, b) => a._n - b._n || a.months - b.months).map(({ _n, ...s }) => s),
+    }));
 }

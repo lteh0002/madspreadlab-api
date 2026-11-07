@@ -15,6 +15,8 @@ const spreadSchema = new mongoose.Schema(
     /** Four-digit contract years, e.g. 2027 */
     frontYear: { type: Number, required: true },
     backYear: { type: Number, required: true },
+    /** Fair value of the spread, set by hand on some spreads; absent when not known */
+    fairValue: { type: Number },
   },
   { versionKey: false },
 );
