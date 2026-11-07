@@ -9,13 +9,29 @@ import { badRequest, httpError, notFound } from '../utils/httpError.js';
 /** Columns every file must have (case-insensitive). Any other columns (indicators) are ignored. */
 const PRICE_COLUMNS = ['open', 'high', 'low', 'close'];
 /**
- * Optional columns, stored when the file has them: header (matched ignoring case, spaces and
- * underscores) → field. A blank cell means "not given" for that bar, not 0.
+ * Optional columns, stored when the file has them: accepted header names (see volumeKey) → field.
+ * A blank cell means "not given" for that bar, not 0.
  */
 const VOLUME_COLUMNS = [
-  { header: 'avol', field: 'aVol', label: 'AVol' },
-  { header: 'bvol', field: 'bVol', label: 'BVol' },
+  { headers: ['avol', 'askvol', 'askvolume', 'askqty'], field: 'aVol', label: 'AVol' },
+  { headers: ['bvol', 'bidvol', 'bidvolume', 'bidqty'], field: 'bVol', label: 'BVol' },
 ];
+
+/**
+ * A header reduced to compare with VOLUME_COLUMNS. Charting exports label study columns like
+ * "FCPO May27-Jun27 Calendar: AVol ‌avol‌ (…)", so this drops the "<instrument>: "
+ * prefix, the zero-width-joiner-wrapped tag, any "(params)", then case and non-alphanumerics.
+ */
+function volumeKey(header) {
+  return String(header ?? '')
+    .replace(/‌[^‌]*‌/g, '')
+    .replace(/[​-‍﻿]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .split(':')
+    .pop()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
 /** How many row problems to spell out in the error message */
 const MAX_LISTED_ERRORS = 5;
 
@@ -64,8 +80,8 @@ export function toBars(table) {
   const header = (table[0] ?? []).map((h) => String(h ?? '').trim().toLowerCase());
   const tsCol = header.findIndex((h) => h.startsWith('timestamp'));
   const priceCols = PRICE_COLUMNS.map((name) => header.indexOf(name));
-  const squashed = header.map((h) => h.replace(/[\s_]+/g, ''));
-  const volumeCols = VOLUME_COLUMNS.map((v) => ({ ...v, col: squashed.indexOf(v.header) })).filter(
+  const keys = header.map(volumeKey);
+  const volumeCols = VOLUME_COLUMNS.map((v) => ({ ...v, col: keys.findIndex((k) => v.headers.includes(k)) })).filter(
     (v) => v.col >= 0,
   );
   const missing = [
