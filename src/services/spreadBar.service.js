@@ -6,13 +6,21 @@ import { parseDataFileName, toFuturesContract } from '../utils/dataFileName.js';
 import { parseCsv } from '../utils/csv.js';
 import { badRequest, httpError, notFound } from '../utils/httpError.js';
 
-/** Columns every file must have (case-insensitive). Any other columns (volumes, indicators) are ignored. */
+/** Columns every file must have (case-insensitive). Any other columns (indicators) are ignored. */
 const PRICE_COLUMNS = ['open', 'high', 'low', 'close'];
+/**
+ * Optional columns, stored when the file has them: header (matched ignoring case, spaces and
+ * underscores) → field. A blank cell means "not given" for that bar, not 0.
+ */
+const VOLUME_COLUMNS = [
+  { header: 'avol', field: 'aVol', label: 'AVol' },
+  { header: 'bvol', field: 'bVol', label: 'BVol' },
+];
 /** How many row problems to spell out in the error message */
 const MAX_LISTED_ERRORS = 5;
 
 /** Header + data rows as arrays of raw cell values (strings for CSV, typed values for Excel) */
-async function readTable(buffer, ext) {
+export async function readTable(buffer, ext) {
   if (ext === '.csv') return parseCsv(buffer.toString('utf8'));
   if (ext === '.xlsx') {
     const workbook = new ExcelJS.Workbook();
@@ -52,10 +60,14 @@ function toNumber(cell) {
 }
 
 /** Turn a table into validated bars, or throw a 400 listing the bad rows */
-function toBars(table) {
+export function toBars(table) {
   const header = (table[0] ?? []).map((h) => String(h ?? '').trim().toLowerCase());
   const tsCol = header.findIndex((h) => h.startsWith('timestamp'));
   const priceCols = PRICE_COLUMNS.map((name) => header.indexOf(name));
+  const squashed = header.map((h) => h.replace(/[\s_]+/g, ''));
+  const volumeCols = VOLUME_COLUMNS.map((v) => ({ ...v, col: squashed.indexOf(v.header) })).filter(
+    (v) => v.col >= 0,
+  );
   const missing = [
     ...(tsCol < 0 ? ['Timestamp (UTC)'] : []),
     ...PRICE_COLUMNS.filter((_, i) => priceCols[i] < 0).map((c) => c[0].toUpperCase() + c.slice(1)),
@@ -83,13 +95,28 @@ function toBars(table) {
       errors.push(`row ${rowNumber}: ${bad.join(', ')} ${bad.length > 1 ? "aren't numbers" : "isn't a number"}`);
       return;
     }
+    const volumes = {};
+    const badVol = [];
+    for (const v of volumeCols) {
+      const cell = row[v.col];
+      if (cell == null || String(cell).trim() === '') continue; // not given for this bar
+      const n = toNumber(cell);
+      if (n === null || n < 0) badVol.push(v.label);
+      else volumes[v.field] = n;
+    }
+    if (badVol.length) {
+      errors.push(
+        `row ${rowNumber}: ${badVol.join(', ')} ${badVol.length > 1 ? "aren't" : "isn't"} a number of 0 or more`,
+      );
+      return;
+    }
     const prev = seen.get(timestamp.getTime());
     if (prev) {
       errors.push(`row ${rowNumber}: same timestamp as row ${prev}`);
       return;
     }
     seen.set(timestamp.getTime(), rowNumber);
-    bars.push({ timestamp, open, high, low, close });
+    bars.push({ timestamp, open, high, low, close, ...volumes });
   });
 
   if (errors.length) {
@@ -101,7 +128,7 @@ function toBars(table) {
     );
   }
   if (!bars.length) throw badRequest('Nothing was imported: the file has no data rows.');
-  return bars;
+  return { bars, volumeColumns: volumeCols.map((v) => v.label) };
 }
 
 /**
@@ -128,7 +155,7 @@ export async function importSpreadBars({ originalName, buffer }) {
   }
   const product = products[0];
 
-  const bars = toBars(await readTable(buffer, ext));
+  const { bars, volumeColumns } = toBars(await readTable(buffer, ext));
 
   // Make sure the spread itself is recorded (created on first upload, left alone after)
   const front = toFuturesContract(near);
@@ -148,10 +175,11 @@ export async function importSpreadBars({ originalName, buffer }) {
   );
 
   const series = { spreadId: spread._id, interval: minutes };
-  const ops = bars.map(({ timestamp, open, high, low, close }) => ({
+  // Volumes are only written when given, so re-uploading a file without them keeps stored ones
+  const ops = bars.map(({ timestamp, ...values }) => ({
     updateOne: {
       filter: { ...series, timestamp },
-      update: { $set: { productId: product._id, open, high, low, close } },
+      update: { $set: { productId: product._id, ...values } },
       upsert: true,
     },
   }));
@@ -176,6 +204,8 @@ export async function importSpreadBars({ originalName, buffer }) {
     structure,
     interval_min: minutes,
     rows: bars.length,
+    /** Optional columns found in the file, e.g. ["AVol", "BVol"] */
+    volumeColumns,
     inserted,
     existing: matched,
     from: first.toISOString(),

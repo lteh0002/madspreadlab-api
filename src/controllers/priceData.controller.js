@@ -10,7 +10,7 @@ export async function listSpreads(req, res) {
 
 /**
  * GET /api/price-data?spreadId=…&interval=15[&from=…&to=…&limit=…]
- * 200 { data: [{ timestamp, open, high, low, close }], interval, limit, truncated }
+ * 200 { data: [{ timestamp, open, high, low, close, aVol?, bVol? }], interval, limit, truncated }
  */
 export async function listPriceData(req, res) {
   res.json(await priceDataService.listPriceData(req.query));

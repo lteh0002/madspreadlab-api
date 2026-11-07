@@ -114,7 +114,7 @@ export async function listPriceData(options = {}) {
   const bars = await SpreadBar.find(filter)
     .sort({ timestamp: -1 })
     .limit(limit)
-    .select({ _id: 0, timestamp: 1, open: 1, high: 1, low: 1, close: 1 })
+    .select({ _id: 0, timestamp: 1, open: 1, high: 1, low: 1, close: 1, aVol: 1, bVol: 1 })
     .lean();
   bars.reverse();
 
