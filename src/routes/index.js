@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import itemRoutes from './item.routes.js';
 import jpxCashRoutes from './jpxCash.routes.js';
-import { createProduct } from '../controllers/product.controller.js';
+import { createProduct, listExpiryRules } from '../controllers/product.controller.js';
 import { uploadData } from '../controllers/upload.controller.js';
 import {
   listFairValues,
@@ -28,6 +28,7 @@ router.get('/spreads', listSpreads);
 router.get('/price-data', listPriceData);
 router.get('/fair-values', listFairValues);
 router.get('/products', listProducts);
+router.get('/expiry-rules', listExpiryRules);
 // NOTE: not protected yet, like the rest of the admin actions
 router.patch('/spreads/:id/fair-value', updateFairValue);
 

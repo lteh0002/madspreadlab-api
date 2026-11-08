@@ -2,6 +2,16 @@ import mongoose from 'mongoose';
 
 export const PRODUCT_TYPES = ['indices', 'commodities'];
 
+/** How a product's expiry date is worked out each month */
+const expiryRuleSchema = new mongoose.Schema(
+  {
+    /** nthLastTradingDay: n = 1 is the month's last trading day, 2 the one before it */
+    type: { type: String, required: true, enum: ['nthLastTradingDay'] },
+    n: { type: Number, required: true, min: 1, max: 10 },
+  },
+  { _id: false },
+);
+
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 200 },
@@ -15,6 +25,10 @@ const productSchema = new mongoose.Schema(
       lowercase: true,
       enum: { values: PRODUCT_TYPES, message: 'productType must be "indices" or "commodities"' },
     },
+    /** Shown on the calendar when set; absent = the product isn't on the calendar */
+    expiryRule: { type: expiryRuleSchema, default: undefined },
+    /** Trading days shown before expiry on the calendar: 5 = T-5 … T-0 */
+    tDays: { type: Number, min: 0, max: 20 },
   },
   { versionKey: false, timestamps: true },
 );
