@@ -40,31 +40,9 @@ async function findProduct(name, exchange) {
 export async function listSpreads({ product: name, exchange } = {}) {
   const product = await findProduct(name, exchange);
 
-  const [spreads, series] = await Promise.all([
-    Spread.find({ productId: product._id }).lean(),
-    SpreadBar.aggregate([
-      { $match: { productId: product._id } },
-      {
-        $group: {
-          _id: { spreadId: '$spreadId', interval: '$interval' },
-          bars: { $sum: 1 },
-          from: { $min: '$timestamp' },
-          to: { $max: '$timestamp' },
-        },
-      },
-      { $sort: { '_id.interval': 1 } },
-    ]),
-  ]);
-
-  const intervalsBySpread = new Map();
-  for (const s of series) {
-    const key = String(s._id.spreadId);
-    if (!intervalsBySpread.has(key)) intervalsBySpread.set(key, []);
-    intervalsBySpread.get(key).push({ interval: s._id.interval, bars: s.bars, from: s.from, to: s.to });
-  }
+  const spreads = await Spread.find({ productId: product._id, 'intervals.0': { $exists: true } }).lean();
 
   const data = spreads
-    .filter((s) => intervalsBySpread.has(String(s._id)))
     // Nearest-expiring first: by front contract year, then month code order
     .sort(
       (a, b) =>
@@ -77,7 +55,7 @@ export async function listSpreads({ product: name, exchange } = {}) {
       front: contractLabel(s.frontMonth, s.frontYear),
       back: contractLabel(s.backMonth, s.backYear),
       fairValue: toFairValue(s.fairValue),
-      intervals: intervalsBySpread.get(String(s._id)),
+      intervals: s.intervals,
     }));
 
   return { product, data };
@@ -181,14 +159,7 @@ export async function listProductsWithSpreads({ productType } = {}) {
     .sort({ name: 1 })
     .lean();
   const productIds = products.map((p) => p._id);
-  const [spreads, counts] = await Promise.all([
-    Spread.find({ productId: { $in: productIds } }).lean(),
-    SpreadBar.aggregate([
-      { $match: { productId: { $in: productIds } } },
-      { $group: { _id: '$spreadId', bars: { $sum: 1 } } },
-    ]),
-  ]);
-  const barsBySpread = new Map(counts.map((c) => [String(c._id), c.bars]));
+  const spreads = await Spread.find({ productId: { $in: productIds } }).lean();
   const byProduct = new Map(products.map((p) => [String(p._id), { ...p, spreads: [] }]));
 
   for (const s of spreads) {
@@ -201,7 +172,7 @@ export async function listProductsWithSpreads({ productType } = {}) {
       back: contractLabel(s.backMonth, s.backYear),
       months: monthNumber(s.backMonth, s.backYear) - monthNumber(s.frontMonth, s.frontYear),
       fairValue: toFairValue(s.fairValue),
-      bars: barsBySpread.get(String(s._id)) ?? 0,
+      bars: (s.intervals ?? []).reduce((sum, i) => sum + i.bars, 0),
       _n: monthNumber(s.frontMonth, s.frontYear),
     });
   }

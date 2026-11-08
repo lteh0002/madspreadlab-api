@@ -1,11 +1,19 @@
 import * as priceDataService from '../services/priceData.service.js';
 
 /**
+ * Lets the CDN answer repeat requests without waking the server. Fresh for 60s, then served stale
+ * for up to an hour while it refreshes in the background. Set only just before a successful
+ * response, so errors are never cached.
+ */
+const CDN_CACHE = 'public, max-age=0, s-maxage=60, stale-while-revalidate=3600';
+
+/**
  * GET /api/spreads?product=MCA[&exchange=HKEX]
  * 200 { product: { _id, name, exchange, currency }, data: [{ id, spreadName, front, back, fairValue (number or null), intervals: [{ interval, bars, from, to }] }] }
  */
 export async function listSpreads(req, res) {
-  res.json(await priceDataService.listSpreads(req.query));
+  const body = await priceDataService.listSpreads(req.query);
+  res.set('Cache-Control', CDN_CACHE).json(body);
 }
 
 /**
@@ -13,7 +21,8 @@ export async function listSpreads(req, res) {
  * 200 { data: [{ timestamp, open, high, low, close, aVol?, bVol? }], interval, limit, truncated }
  */
 export async function listPriceData(req, res) {
-  res.json(await priceDataService.listPriceData(req.query));
+  const body = await priceDataService.listPriceData(req.query);
+  res.set('Cache-Control', CDN_CACHE).json(body);
 }
 
 /**

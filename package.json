@@ -6,7 +6,8 @@
     "dev": "node --watch-path=./src --env-file=.env src/server.js",
     "start": "node src/server.js",
     "import:jpx": "node --env-file=.env src/scripts/import-jpx-cash.js",
-    "db:ping": "node --env-file=.env src/scripts/db-ping.js"
+    "db:ping": "node --env-file=.env src/scripts/db-ping.js",
+    "db:backfill-intervals": "node --env-file=.env src/scripts/backfill-spread-intervals.js"
   },
   "keywords": [],
   "author": "",

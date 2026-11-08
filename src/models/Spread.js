@@ -17,6 +17,22 @@ const spreadSchema = new mongoose.Schema(
     backYear: { type: Number, required: true },
     /** Fair value of the spread, set by hand on some spreads; absent when not known */
     fairValue: { type: Number },
+    /**
+     * Bar intervals with price data, shortest first, so listing spreads never has to read the
+     * bars. Rewritten on every upload; absent or empty when the spread has no bars.
+     */
+    intervals: {
+      type: [
+        {
+          _id: false,
+          interval: Number,
+          bars: Number,
+          from: Date,
+          to: Date,
+        },
+      ],
+      default: undefined,
+    },
   },
   { versionKey: false },
 );

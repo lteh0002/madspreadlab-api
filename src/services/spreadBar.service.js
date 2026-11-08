@@ -148,6 +148,30 @@ export function toBars(table) {
 }
 
 /**
+ * Recount a spread's bars and save the result on the spread (its `intervals`).
+ * Safe to repeat. Call it after anything that adds or removes bars.
+ *
+ * @param {import('mongoose').Types.ObjectId} spreadId
+ */
+export async function refreshSpreadIntervals(spreadId) {
+  const intervals = await SpreadBar.aggregate([
+    { $match: { spreadId } },
+    {
+      $group: {
+        _id: '$interval',
+        bars: { $sum: 1 },
+        from: { $min: '$timestamp' },
+        to: { $max: '$timestamp' },
+      },
+    },
+    { $sort: { _id: 1 } },
+    { $project: { _id: 0, interval: '$_id', bars: 1, from: 1, to: 1 } },
+  ]);
+  await Spread.updateOne({ _id: spreadId }, { $set: { intervals } });
+  return intervals;
+}
+
+/**
  * Import an uploaded price file. The file name says which product and series it is.
  * All-or-nothing: if any row is invalid, nothing is written.
  * Re-uploading is safe: bars are upserted on (spreadId, interval, timestamp).
@@ -203,6 +227,7 @@ export async function importSpreadBars({ originalName, buffer }) {
   // Ensure the unique series+timestamp index exists before upserting (idempotent)
   await SpreadBar.createIndexes();
   const res = await SpreadBar.collection.bulkWrite(ops, { ordered: false });
+  await refreshSpreadIntervals(spread._id);
   // New bars are upserts; bars already stored (same series + timestamp) are matched and refreshed
   const inserted = res.upsertedCount;
   const matched = res.matchedCount;
