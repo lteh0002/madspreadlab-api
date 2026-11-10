@@ -205,3 +205,17 @@ export async function setFairValue(spreadId, body = {}) {
   if (!spread) throw notFound("That spread doesn't exist.");
   return { id: spread._id, fairValue: toFairValue(spread.fairValue) };
 }
+
+/**
+ * Permanently delete a spread and all its price bars. The bars go first, so if this fails
+ * part-way the spread is still listed and the delete can be retried.
+ * Resolves with { id, barsDeleted }.
+ */
+export async function deleteSpread(spreadId) {
+  if (!mongoose.isValidObjectId(spreadId)) throw badRequest('Invalid spread id');
+  if (!(await Spread.exists({ _id: spreadId }))) throw notFound("That spread doesn't exist.");
+
+  const { deletedCount } = await SpreadBar.deleteMany({ spreadId });
+  await Spread.deleteOne({ _id: spreadId });
+  return { id: spreadId, barsDeleted: deletedCount };
+}

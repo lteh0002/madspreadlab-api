@@ -50,3 +50,12 @@ export async function listProducts(req, res) {
 export async function updateFairValue(req, res) {
   res.json({ data: await priceDataService.setFairValue(req.params.id, req.body ?? {}) });
 }
+
+/**
+ * DELETE /api/spreads/:id
+ * Removes the spread and its price_data bars.
+ * 200 { data: { id, barsDeleted } }
+ */
+export async function deleteSpread(req, res) {
+  res.json({ data: await priceDataService.deleteSpread(req.params.id) });
+}

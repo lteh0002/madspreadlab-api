@@ -5,6 +5,7 @@ import jpxCashRoutes from './jpxCash.routes.js';
 import { createProduct, listExpiryRules } from '../controllers/product.controller.js';
 import { uploadData } from '../controllers/upload.controller.js';
 import {
+  deleteSpread,
   listFairValues,
   listPriceData,
   listProducts,
@@ -31,5 +32,6 @@ router.get('/products', listProducts);
 router.get('/expiry-rules', listExpiryRules);
 // NOTE: not protected yet, like the rest of the admin actions
 router.patch('/spreads/:id/fair-value', updateFairValue);
+router.delete('/spreads/:id', deleteSpread);
 
 export default router;
