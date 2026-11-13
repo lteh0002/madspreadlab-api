@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema(
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email address'],
     },
     name: { type: String, trim: true, maxlength: 200 },
+    userType: { type: String, enum: ['admin', 'user'], default: 'user' },
     /** scrypt hash from utils/password.js; never sent to clients */
     passwordHash: { type: String, required: true, select: false },
     lastLoginAt: { type: Date },
