@@ -5,12 +5,30 @@ export const PRODUCT_TYPES = ['indices', 'commodities'];
 /** How a product's expiry date is worked out each month */
 const expiryRuleSchema = new mongoose.Schema(
   {
-    /** nthLastTradingDay: n = 1 is the month's last trading day, 2 the one before it */
-    type: { type: String, required: true, enum: ['nthLastTradingDay'] },
+    /**
+     * nthLastTradingDay: n = 1 is the month's last trading day, 2 the one before it
+     * nthWeekday: the n-th `weekday` of the month, e.g. n = 3, weekday = 5 is the 3rd Friday;
+     *   the portal moves it to the trading day before when it falls on a holiday
+     */
+    type: { type: String, required: true, enum: ['nthLastTradingDay', 'nthWeekday'] },
     n: { type: Number, required: true, min: 1, max: 10 },
+    /** nthWeekday only: 0 = Sunday … 6 = Saturday */
+    weekday: {
+      type: Number,
+      min: 0,
+      max: 6,
+      required() {
+        return this.type === 'nthWeekday';
+      },
+    },
   },
   { _id: false },
 );
+
+expiryRuleSchema.pre('validate', function () {
+  if (this.type === 'nthWeekday' && this.n > 5) this.invalidate('n', 'nthWeekday n must be 1–5');
+  if (this.type !== 'nthWeekday') this.weekday = undefined;
+});
 
 const productSchema = new mongoose.Schema(
   {
