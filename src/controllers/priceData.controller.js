@@ -1,11 +1,11 @@
 import * as priceDataService from '../services/priceData.service.js';
 
 /**
- * Lets the CDN answer repeat requests without waking the server. Fresh for 60s, then served stale
- * for up to an hour while it refreshes in the background. Set only just before a successful
- * response, so errors are never cached.
+ * Lets the browser reuse a response for 60s. `private`: these need a login, so a shared CDN must
+ * never store them (it could hand them to someone who isn't signed in). Set only just before a
+ * successful response, so errors are never cached.
  */
-const CDN_CACHE = 'public, max-age=0, s-maxage=60, stale-while-revalidate=3600';
+const BROWSER_CACHE = 'private, max-age=60';
 
 /**
  * GET /api/spreads?product=MCA[&exchange=HKEX]
@@ -13,7 +13,7 @@ const CDN_CACHE = 'public, max-age=0, s-maxage=60, stale-while-revalidate=3600';
  */
 export async function listSpreads(req, res) {
   const body = await priceDataService.listSpreads(req.query);
-  res.set('Cache-Control', CDN_CACHE).json(body);
+  res.set('Cache-Control', BROWSER_CACHE).json(body);
 }
 
 /**
@@ -22,7 +22,7 @@ export async function listSpreads(req, res) {
  */
 export async function listPriceData(req, res) {
   const body = await priceDataService.listPriceData(req.query);
-  res.set('Cache-Control', CDN_CACHE).json(body);
+  res.set('Cache-Control', BROWSER_CACHE).json(body);
 }
 
 /**

@@ -11,11 +11,10 @@ export async function createProduct(req, res) {
 }
 
 /**
- * Expiry rules only change when db:set-expiry is run, so they can be cached for a long time:
- * 1 hour in the browser, 1 day on the CDN, then served stale for up to 7 days while it refreshes.
- * Redeploying clears the CDN's copy.
+ * Expiry rules only change when db:set-expiry is run, so the browser keeps them for an hour.
+ * `private`: they need a login, so a shared CDN must never store them.
  */
-const EXPIRY_RULES_CACHE = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800';
+const EXPIRY_RULES_CACHE = 'private, max-age=3600';
 
 /** GET /api/expiry-rules – products with an expiry rule, for the calendar */
 export async function listExpiryRules(req, res) {
