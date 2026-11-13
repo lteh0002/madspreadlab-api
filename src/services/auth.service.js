@@ -11,7 +11,12 @@ export const MIN_PASSWORD_LENGTH = 8;
 export const hashSessionToken = (token) => createHash('sha256').update(String(token)).digest('hex');
 
 /** What clients see of a user */
-const publicUser = (user) => ({ id: String(user._id), email: user.email, name: user.name });
+const publicUser = (user) => ({
+  id: String(user._id),
+  email: user.email,
+  name: user.name,
+  userType: user.userType ?? 'user',
+});
 
 /** { token, user } for a correct email + password; 401 otherwise (same message either way) */
 export async function login({ email, password } = {}) {
@@ -51,4 +56,10 @@ export async function createUser({ email, password, name } = {}) {
   }
   const user = await User.create({ email, name, passwordHash: await hashPassword(password) });
   return publicUser(user);
+}
+
+/** The user as clients see it, or null if the account no longer exists */
+export async function getUser(id) {
+  const user = await User.findById(id).lean();
+  return user && publicUser(user);
 }

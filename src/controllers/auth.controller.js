@@ -1,4 +1,5 @@
 import * as authService from '../services/auth.service.js';
+import { httpError } from '../utils/httpError.js';
 
 /**
  * POST /api/login
@@ -13,4 +14,11 @@ export async function login(req, res) {
 export async function logout(req, res) {
   await authService.endSession(req.auth.sessionId);
   res.status(204).end();
+}
+
+/** GET /api/me (signed in) – the current user, e.g. to pick up a changed userType */
+export async function me(req, res) {
+  const user = await authService.getUser(req.auth.userId);
+  if (!user) throw httpError(401, 'Sign in required');
+  res.set('Cache-Control', 'no-store').json({ user });
 }
