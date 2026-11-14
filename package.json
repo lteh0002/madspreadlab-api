@@ -9,6 +9,7 @@
     "db:ping": "node --env-file=.env src/scripts/db-ping.js",
     "db:backfill-intervals": "node --env-file=.env src/scripts/backfill-spread-intervals.js",
     "db:set-expiry": "node --env-file=.env src/scripts/set-expiry-rule.js",
+    "db:set-tick": "node --env-file=.env src/scripts/set-tick.js",
     "user:create": "node --env-file=.env src/scripts/create-user.js"
   },
   "keywords": [],

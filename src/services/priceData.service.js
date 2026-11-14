@@ -24,7 +24,7 @@ function toFairValue(value) {
 async function findProduct(name, exchange) {
   if (!name) throw badRequest('Missing product, e.g. ?product=MCA');
   const filter = { name, ...(exchange && { exchange }) };
-  const products = await Product.find(filter).select('_id name exchange currency').limit(2).lean();
+  const products = await Product.find(filter).select('_id name exchange currency tickSize tickValue').limit(2).lean();
   if (!products.length) throw notFound(`Product "${name}"${exchange ? ` on ${exchange}` : ''} doesn't exist.`);
   if (products.length > 1) {
     throw httpError(409, `More than one product is named "${name}". Add &exchange=… to pick one.`);

@@ -47,6 +47,10 @@ const productSchema = new mongoose.Schema(
     expiryRule: { type: expiryRuleSchema, default: undefined },
     /** Trading days shown before expiry on the calendar: 5 = T-5 … T-0 */
     tDays: { type: Number, min: 0, max: 20 },
+    /** Minimum price move, in index points / price units, e.g. 0.5 */
+    tickSize: { type: Number, validate: { validator: (v) => v > 0, message: 'tickSize must be greater than 0' } },
+    /** Money value of one tick for one contract, in `currency`, e.g. 25 */
+    tickValue: { type: Number, validate: { validator: (v) => v > 0, message: 'tickValue must be greater than 0' } },
   },
   { versionKey: false, timestamps: true },
 );
